@@ -5,9 +5,15 @@ using UnityEngine;
 namespace One.Test
 {
 	[InjectionReceiver]
+	[GlobalInjectable(typeof(TestPureClass))]
 	public class TestPureClass
 	{
 		[Inject] TestGlobalInjectable globalInjectable = null;
+
+		public TestPureClass()
+		{
+			Debug.Log("TestPureClass constructor");
+		}
 
 		int counter = 0;
 		public void Method()
@@ -25,7 +31,7 @@ namespace One.Test
 		[Inject] ITestInterfaceOne interfaceOne = null;
 		[Inject] ITestInterfaceTwo interfaceTwo = null;
 		[Inject(InjectionType.Unique)] TestPureClass pureClassUnique = null;
-		[Inject] TestPureClass pureClassShared= null;
+		[Inject] TestPureClass pureClassShared = null;
 
 		private void Start()
 		{

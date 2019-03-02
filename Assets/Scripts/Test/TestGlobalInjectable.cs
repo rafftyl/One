@@ -9,7 +9,7 @@ namespace One.Test
 		void Method();
 	}
 
-	[GlobalInjectable(typeof(ITestInterfaceOne))]
+	[GlobalInjectable(typeof(ITestInterfaceOne), typeof(TestGlobalInjectable))]
 	[InjectionReceiver]
 	public class TestGlobalInjectable : MonoBehaviour, ITestInterfaceOne
 	{
