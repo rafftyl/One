@@ -26,8 +26,8 @@ namespace One.Test
 	[InjectionReceiver]
 	public class InjectionTestMonoBehavior : MonoBehaviour
 	{
-		//[Inject(InjectionType.Component)] TestSiblingComponent sibling = null;
-		//[Inject(InjectionType.Component)] TestChildComponent child = null;
+		[Inject(InjectionType.Component)] TestSiblingComponent sibling = null;
+		[Inject(InjectionType.Component)] TestChildComponent child = null;
 		[Inject] ITestInterfaceOne interfaceOne = null;
 		[Inject] ITestInterfaceTwo interfaceTwo = null;
 		[Inject(InjectionType.Unique)] TestPureClass pureClassUnique = null;
@@ -35,8 +35,8 @@ namespace One.Test
 
 		private void Start()
 		{
-			//sibling.Method();
-			//child.Method();
+			sibling.Method();
+			child.Method();
 			interfaceOne.Method();
 			interfaceTwo.Method();
 			pureClassUnique.Method();
