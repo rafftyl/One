@@ -7,16 +7,16 @@ using UnityEngine.Assertions;
 
 namespace One
 {
-	public partial class DependencyResolver : MonoBehaviour
+	public class DependencyResolver : MonoBehaviour
 	{
 		[SerializeField] GameObject[] injectablePrefabs = null;
 		[SerializeField] ScriptableObject[] globalInjectableResources = null;
 
-		Dictionary<System.Type, GameObject> injectablePrefabPrototypeMap = new Dictionary<System.Type, GameObject>();
-		Dictionary<System.Type, System.Type> pureClassInjectableMap = new Dictionary<System.Type, System.Type>();
+		Dictionary<Type, GameObject> injectablePrefabPrototypeMap = new Dictionary<Type, GameObject>();
+		Dictionary<Type, Type> pureClassInjectableMap = new Dictionary<Type, Type>();
 
-		Dictionary<System.Type, object> globalInjectables = new Dictionary<System.Type, object>();
-		Dictionary<System.Type, object> persistentInjectables = new Dictionary<System.Type, object>();
+		Dictionary<Type, object> globalInjectables = new Dictionary<Type, object>();
+		static Dictionary<Type, object> persistentInjectables = new Dictionary<Type, object>();
 
 		private static DependencyResolver resolverInstance;
 		public static DependencyResolver Instance
@@ -26,7 +26,6 @@ namespace One
 				if(resolverInstance == null)
 				{
 					resolverInstance = UnityEngine.Object.Instantiate(Resources.Load<DependencyResolver>("DependencyResolver"));
-					resolverInstance.Initialize();
 				}
 
 				return resolverInstance;
@@ -37,23 +36,17 @@ namespace One
 
 		private void Awake()
 		{
-			if (resolverInstance != null)
-			{
-				if (resolverInstance != this)
-				{
-					Destroy(this);
-				}
+			if (resolverInstance != null && resolverInstance != this)
+			{				
+				Destroy(resolverInstance);				
 			}
-			else
-			{
-				resolverInstance = this;
-				Initialize();
-			}
+
+			resolverInstance = this;
+			Initialize();			
 
 			InjectDependenciesAtScenes();
 		}
 
-		partial void SetPureClassInjectables();
 		private void Initialize()
 		{
 			foreach(var resource in globalInjectableResources)
@@ -77,58 +70,33 @@ namespace One
 				}
 			}
 
-			SetPureClassInjectables();
-		}
-
-		public void AddInjectablesToMap(IEnumerable<object> injectables)
-		{
-			foreach(var injectable in injectables)
+			var ruleProviders = GetComponents<InjectionRuleProvider>();
+			foreach(var provider in ruleProviders)
 			{
-				AddInjectableToMap(injectable);
-			}
-		}
-
-		public void AddInjectablesToMap(params object[] injectables)
-		{
-			AddInjectablesToMap(injectables as IEnumerable<object>);
-		}
-
-		public void AddInjectableToMap(object injectable)
-		{
-			var type = injectable.GetType();
-			var injectableAttribute = type.GetCustomAttribute<GlobalInjectable>();
-			if (injectableAttribute != null)
-			{
-				var injectableMap = injectableAttribute.IsPersistent ? globalInjectables : persistentInjectables;
-				foreach (var injectedType in injectableAttribute.InjectedAsTypes)
+				var rules = provider.InjectionRules;
+				foreach(var rule in rules)
 				{
-					injectableMap.Add(injectedType, injectable);
+					pureClassInjectableMap.Add(rule.Key, rule.Value);
 				}
 			}
 		}
 
-		public void SetPureClassInjectableMapping<InjectedType, CreatedType>()
-		{
-			pureClassInjectableMap.Add(typeof(InjectedType), typeof(CreatedType));
-		}
-		
-
 		List<MonoBehaviour> cachedInjectionReceivers = new List<MonoBehaviour>();
-		public void InjectDependenciesAtScenes()
+		private void InjectDependenciesAtScenes()
 		{
 			cachedInjectionReceivers.Clear();
-			for(int sceneIndex = 0; sceneIndex < SceneManager.sceneCount; ++sceneIndex)
+			for (int sceneIndex = 0; sceneIndex < SceneManager.sceneCount; ++sceneIndex)
 			{
 				Scene scene = SceneManager.GetSceneAt(sceneIndex);
-				if(scene.rootCount == 0)
+				if (scene.rootCount == 0)
 				{
 					Debug.LogWarning("Passed an empty scene to dependency injection");
 				}
 
-				foreach(var rootGO in scene.GetRootGameObjects())
+				foreach (var rootGO in scene.GetRootGameObjects())
 				{
 					MonoBehaviour[] monoBehaviours = rootGO.GetComponentsInChildren<MonoBehaviour>();
-					foreach(MonoBehaviour monoBeh in monoBehaviours)
+					foreach (MonoBehaviour monoBeh in monoBehaviours)
 					{
 						var type = monoBeh.GetType();
 						if (type.GetCustomAttribute<InjectionReceiver>() != null)
@@ -147,23 +115,23 @@ namespace One
 			}
 		}
 
-		public void InjectDependencies(GameObject injectionReceiver)
+		private void InjectDependencies(GameObject injectionReceiver)
 		{
 			MonoBehaviour[] monoBehaviours = injectionReceiver.GetComponentsInChildren<MonoBehaviour>();
-			foreach(MonoBehaviour monoBeh in monoBehaviours)
+			foreach (MonoBehaviour monoBeh in monoBehaviours)
 			{
 				InjectDependencies(monoBeh);
 			}
 		}
 
-		public void InjectDependencies(object classInstance)
+		private void InjectDependencies(object classInstance)
 		{
 			var currentType = classInstance.GetType();
 			var injectionReceiverAttr = currentType.GetCustomAttribute<InjectionReceiver>();
 			while (currentType != null && injectionReceiverAttr != null)
 			{
 				//TODO: component injection
-				foreach(var fieldInfo in
+				foreach (var fieldInfo in
 					currentType.GetFields(BindingFlags.Instance |
 					BindingFlags.Public | BindingFlags.NonPublic))
 				{
@@ -179,19 +147,51 @@ namespace One
 								InjectUnique(classInstance, fieldInfo);
 								break;
 							case InjectionType.Component:
-								InjectDownInHierarchy(classInstance, fieldInfo);
+								InjectDownInHierarchy(classInstance as MonoBehaviour, fieldInfo);
 								break;
 							case InjectionType.ComponentUpInHierarchy:
-								InjectUpInHierarchy(classInstance, fieldInfo);
+								InjectUpInHierarchy(classInstance as MonoBehaviour, fieldInfo);
 								break;
 						}
 					}
-					
+
 				}
 				currentType = currentType.BaseType;
 				injectionReceiverAttr = currentType.GetCustomAttribute<InjectionReceiver>();
 			}
 		}
+
+		private void AddInjectablesToMap(IEnumerable<object> injectables)
+		{
+			foreach(var injectable in injectables)
+			{
+				AddInjectableToMap(injectable);
+			}
+		}
+
+		private void AddInjectablesToMap(params object[] injectables)
+		{
+			AddInjectablesToMap(injectables as IEnumerable<object>);
+		}
+
+		private void AddInjectableToMap(object injectable)
+		{
+			var type = injectable.GetType();
+			var injectableAttribute = type.GetCustomAttribute<GlobalInjectable>();
+			if (injectableAttribute != null)
+			{
+				var injectableMap = injectableAttribute.IsPersistent ? globalInjectables : persistentInjectables;
+				foreach (var injectedType in injectableAttribute.InjectedAsTypes)
+				{
+					injectableMap.Add(injectedType, injectable);
+				}
+			}
+		}
+
+		private void SetPureClassInjectableMapping<InjectedType, CreatedType>()
+		{
+			pureClassInjectableMap.Add(typeof(InjectedType), typeof(CreatedType));
+		}		
 
 		private void InjectGlobal(object classInstance, FieldInfo member)
 		{
@@ -217,6 +217,16 @@ namespace One
 					InjectIntoMember(classInstance, member, instance);
 					return;
 				}
+				else if(!member.FieldType.IsInterface &&
+					!member.FieldType.IsAbstract && 
+					!member.FieldType.IsSubclassOf(typeof(MonoBehaviour)))
+				{
+					Debug.Log($"No suitable creation rule for {member.FieldType.Name} has been found. Creating default object");
+					var instance = CreateClassInstance(member.FieldType);
+					AddInjectableToMap(instance);
+					InjectIntoMember(classInstance, member, instance);
+					return;
+				}
 
 				Debug.LogWarning("Couldn't find an injectable of type " + member.FieldType + " for field " +
 						member.Name + " in class " + classInstance.GetType().Name);				
@@ -235,30 +245,24 @@ namespace One
 			}
 		}
 
-		private void InjectDownInHierarchy(object classInstance, FieldInfo member)
+		private void InjectDownInHierarchy(MonoBehaviour classInstance, FieldInfo member)
 		{
-			var monoBeh = classInstance as MonoBehaviour;
-			Assert.IsNotNull(monoBeh);
-			var component = monoBeh.GetComponentInChildren(member.FieldType);
+			Assert.IsNotNull(classInstance);
+			var component = classInstance.GetComponentInChildren(member.FieldType);
 			if (component != null)
 			{
 				InjectIntoMember(classInstance, member, component);
 			}
 			else
 			{
-				//TODO: add component?
-				Debug.LogWarning("Couldn't find a component of type " + member.FieldType + " for field " +
-						member.Name + " in class " + classInstance.GetType().Name + " down in hierarchy from object " 
-						+ monoBeh.name);
+				AddDefaultComponent(classInstance, member);
 			}
 		}
 
-		private void InjectUpInHierarchy(object classInstance, FieldInfo member)
+		private void InjectUpInHierarchy(MonoBehaviour classInstance, FieldInfo member)
 		{
-			var monoBeh = classInstance as MonoBehaviour;
-			Assert.IsNotNull(monoBeh);
-
-			Transform current = monoBeh.transform;
+			Assert.IsNotNull(classInstance);
+			Transform current = classInstance.transform;
 			while(current != null)
 			{
 				var component = current.GetComponent(member.FieldType);
@@ -269,10 +273,24 @@ namespace One
 				}
 				current = current.parent;
 			}
-			//TODO: add component?
+			AddDefaultComponent(classInstance, member);
+		}
+
+		private void AddDefaultComponent(MonoBehaviour classInstance, FieldInfo member)
+		{
 			Debug.LogWarning("Couldn't find a component of type " + member.FieldType + " for field " +
-						member.Name + " in class " + classInstance.GetType().Name + " up in hierarchy from object " 
-						+ monoBeh.name);
+			member.Name + " in class " + classInstance.GetType().Name + " up in hierarchy from object "
+			+ classInstance.name + ". Adding default if possible.");
+			if (!member.FieldType.IsInterface)
+			{
+				var createdComponent = classInstance.gameObject.AddComponent(member.FieldType);
+				InjectIntoMember(classInstance, member, createdComponent);
+			}
+			else if (pureClassInjectableMap.TryGetValue(member.FieldType, out var newInstanceType))
+			{
+				var instance = CreateClassInstance(newInstanceType);
+				InjectIntoMember(classInstance, member, instance);
+			}
 		}
 
 		private void InjectIntoMember(object classInstance, FieldInfo FieldInfo, object memberValue)
@@ -305,11 +323,6 @@ namespace One
 			var instance = UnityEngine.Object.Instantiate(original);
 			InjectDependencies(instance);
 			return instance;
-		}
-
-		public void Clear()
-		{
-			globalInjectables.Clear();
 		}
 	}
 }

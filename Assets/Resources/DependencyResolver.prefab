@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 6720468091730731194}
   - component: {fileID: 6814724058732979545}
+  - component: {fileID: 1043433941}
   m_Layer: 0
   m_Name: DependencyResolver
   m_TagString: Untagged
@@ -43,8 +44,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ee010394025db924580c45dc3fb1e2ee, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  injectablePrefabs:
-  - {fileID: 6437778152943317591, guid: f86db3f86dcda3a459811686008731f2, type: 3}
-  - {fileID: 4959097696829888008, guid: 69c12821d7dbc68478253c9393b6bfd2, type: 3}
-  globalInjectableResources:
-  - {fileID: 11400000, guid: f94f683923b337a4b9beea45c3fdbddf, type: 2}
+  injectablePrefabs: []
+  globalInjectableResources: []
+--- !u!114 &1043433941
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2249090133969491179}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6fdd21e44f7eb69459a40ee330a72944, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
